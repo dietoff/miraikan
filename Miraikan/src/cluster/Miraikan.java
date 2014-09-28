@@ -52,7 +52,7 @@ public class Miraikan extends PApplet {
 	float minX,maxX;
 	float minY,maxY;
 	
-	private boolean rad = true; // use radians (mercator mode)
+//	private boolean rad = true; // use radians (mercator mode)
 	private boolean cluster = false;
 	private int cols;
 	private String tblfile = "data/1deg_grid.csv";
@@ -112,7 +112,7 @@ public class Miraikan extends PApplet {
 	public void setup() {
 		p = this;
 		size(wScreen, hScreen,P3D);
-		if (rad) loadImgRad(inputimg, false); else loadImg(inputimg);
+		 loadImgRad(inputimg, false);
 		
 		for (int i=0;i<clusters.length; i++) println("color:" + clusters[i].color + ", " +clusters[i].nodes.size());
 		println("tot. n. nodes:"+ nodes.length);
@@ -293,16 +293,16 @@ public class Miraikan extends PApplet {
 
 		switch (mode) {
 		case 'v': // sort horizontal
-			if (rad) histogramRad(nodes); else histogram(nodes);
+			histogramRad(nodes);
 			break;
 		case 'h':
-			if (rad) horizontalRad(nodes); else horizontal(nodes); // sort vertical
+			horizontalRad(nodes); 
 			break;
 		case 'm':
-			map(nodes, rad); //map
+			map(nodes); //map
 			break;
 		case 'f':
-			force(nodes, rad); // free forces
+			force(nodes); // free forces
 			break;
 		}
 
@@ -408,13 +408,13 @@ public class Miraikan extends PApplet {
 	 * works for both rad
 	 * @param nodes
 	 */
-	private void map(Node[]  nodes, boolean rad) {
+	private void map(Node[]  nodes) {
 		{
 			for (Node n : nodes)
 				n.goal = new Vector(n.origin.x, n.origin.y);
 
 			moveToGoal(nodes);
-			if (rad) renderNodesRad(nodes); else renderNodes(nodes);
+			renderNodesRad(nodes);
 		}
 	}
 
@@ -423,7 +423,7 @@ public class Miraikan extends PApplet {
 	 * 
 	 * @param nodes
 	 */
-	private void force(Node[]  nodes, boolean rad) {
+	private void force(Node[]  nodes) {
 
 		// repel nodes
 		if(cluster) repPerCluster(clusters); else repelOpt(nodes);
@@ -432,12 +432,12 @@ public class Miraikan extends PApplet {
 		for (int i = 0; i < clusters.length; i++) {
 			Cluster c = clusters[i];
 			c.updateCenter(); // calculate new cluster center
-			c.attractNodes(attractFactor, rad);// make nodes move tow the cluster center
+			c.attractNodes(attractFactor);// make nodes move tow the cluster center
 		}
 
-		if (rad) boundaryRad(nodes); else boundary(nodes); // make borders of the screen repelling
+		boundaryRad(nodes);  // make borders of the screen repelling
 		
-		if (rad) renderNodesRad(nodes); else renderNodes(nodes); // render our nodes and text
+		renderNodesRad(nodes);  // render our nodes and text
 	}
 
 	private void moveToGoal(Node[] nodes) {
@@ -474,18 +474,18 @@ public class Miraikan extends PApplet {
 	
 	private void repPerCluster(Cluster[] clusters2) {
 		double minDistance;
-		if (rad){
+//		if (rad){
 			minDistance = 0.00001;
 			maxDistance = wScreen/3.0;
-		}
-		else{
-			minDistance = 0.01;
-			maxDistance = PI/6.0;
-		}
+//		}
+//		else{
+//			minDistance = 0.01;
+//			maxDistance = PI/6.0;
+//		}
 		
 		for (int i = 0; i < clusters.length; i++) {
 			Cluster c = clusters[i];
-			if (rad) c.repelNodes(repelFactor, maxDistanceM, diameter, minDistance); else c.repelNodes(repelFactor,  maxDistance, diameter, minDistance);// make nodes repel from cluster center
+			 c.repelNodes(repelFactor, maxDistanceM, diameter, minDistance);// make nodes repel from cluster center
 		}
 		
 		for (int i = 0; i < clusters.length; i++) {
@@ -526,33 +526,18 @@ public class Miraikan extends PApplet {
 	private void repelOpt(Node[] nodes) {
 		int gridx = 1, gridy = 1;
 
-		if (rad) {
-			float cellLength = diameter * 10;
-			int ox = (int) (maxX / cellLength);
-			int oy = (int) (PI / cellLength);
+		float cellLength = diameter * 10;
+		int ox = (int) (maxX / cellLength);
+		int oy = (int) (PI / cellLength);
 
-			double d = Math.random();
-			gridx = ox - (int) (ox / 2 * d);
-			gridy = oy - (int) (oy / 2 * d);
-			
-		} else {
-			float cellLength = diameter * 20;
-			int ox = (int) (wScreen / cellLength);
-			int oy = (int) (hScreen / cellLength);
-
-			double d = Math.random();
-			gridx = ox - (int) (ox / 2 * d);
-			gridy = oy - (int) (oy / 2 * d);
-		}
+		double d = Math.random();
+		gridx = ox - (int) (ox / 2 * d);
+		gridy = oy - (int) (oy / 2 * d);
 
 		// long startTime = System.nanoTime();
 
 		Grid grid;
-		if (rad) {
-			grid = makeGridRad(nodes, gridx, gridy);
-		} else {
-			grid = makeGrid(nodes, gridx, gridy);
-		}
+		grid = makeGridRad(nodes, gridx, gridy);
 		iterGrid(grid);
 
 		// long endTime = System.nanoTime();
@@ -564,21 +549,15 @@ public class Miraikan extends PApplet {
 	private void iterGrid(Grid grid) {
 		int cutoffdist = 9; // max distance for rough calc (squared)
 		int precdist = 4; // max distance for precision calc (squared)
-		
+
 		for (Cell cell:grid.getCells()) {
 			for (Node n : cell.nodes) {
 				for (Cell c:grid.getCells()){
 					double dist = distanceSq(new Vector(cell.x,cell.y), new Vector(c.x,c.y)); //topological distance between cells
 					if (dist <= cutoffdist) {
-						if (dist > precdist)
-							if (rad) repelCellRad(n, c.nodes); else repelCell(n, c.nodes);
+						if (dist > precdist) repelCellRad(n, c.nodes);
 						else {
-							if (rad)
-								for (Node n2 : c.nodes)
-									repelNodesRad(n, n2);
-							else
-								for (Node n2 : c.nodes)
-									repelNodes(n, n2);
+							for (Node n2 : c.nodes) repelNodesRad(n, n2);
 						}
 					}
 				}
@@ -598,32 +577,7 @@ public class Miraikan extends PApplet {
 		return grid;
 	}
 
-	private void repelCell(Node n1, List<Node> n2) {
-		if (n2 == null)
-			return;
-
-		double meanx = 0;
-		double meany = 0;
-		int count = 0;
-		for (Node n : n2) {
-			meanx += n.pos.x;
-			meany += n.pos.y;
-			count++;
-		}
-		meanx = meanx / count;
-		meany = meany / count;
-		Vector p = new Vector(meanx, meany);
-
-		double minDistance = 0.01;
-		double distance = Math.max(Vector.sqDistance(n1.pos, p), minDistance);
-		if (distance < maxDistance) {
-			Vector d = Vector.subtract(p, n1.pos);
-			d.mult(repelFactor * diameter / distance);
-			for (Node n : n2)
-				n.pos.add(d);
-			n1.pos.subtract(d);
-		}
-	}
+	
 	
 	private void repelNodesRad(Node n1, Node n2) {
 		if (n1 != n2) {
@@ -800,44 +754,41 @@ public class Miraikan extends PApplet {
 			clusters=new Cluster[0];
 			nodes = new Node[0];
 			start = frameCount;
-			if (rad) loadImgRad("data/rain/"+counter+".png", true); else loadImg(inputimg); 
+			loadImgRad("data/rain/"+counter+".png", true); 
 			break;
 		case 'z':
-			rad = !rad;
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
-			// rec = !rec; //record sequence
 			break;
 		case '0':
 			start = frameCount;
 			inputimg = "data/veg90.png";
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false); 
 			break;
 		case '6':
 			start = frameCount;
 			inputimg = "data/63prc_500.png";
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false); 
 			break;
 		case '8':
 			start = frameCount;
 			inputimg = "data/250_night.png";
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false); 
 			break;
 		case '9':
 			start = frameCount;
 			inputimg = "data/500_night.png";
 			stack = false;
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false); 
 			break;
 		case '5':
 			start = frameCount;
 			inputimg = "data/veg_cities.png";
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false); 
 			break;
 		case '7':
 			start = frameCount;
 			inputimg = "data/access2.png";
 			stack = true;
-			if (rad) loadImgRad(inputimg, false); else loadImg(inputimg); 
+			loadImgRad(inputimg, false);
 			break;
 		case '-':
 			clusters=new Cluster[0];
@@ -882,10 +833,6 @@ public class Miraikan extends PApplet {
 		return Math.abs((1/Math.cos(y)*diameter));
 	}
 	
-	private void loadFlow() {
-		
-	}
-	
 	private LatLon greatCircle(double prc, double x1, double y1, double x2, double y2) {
 		LatLon pos1 = new LatLon(Angle.fromRadians(x1), Angle.fromRadians(y1));
 		LatLon pos2 = new LatLon(Angle.fromRadians(x2), Angle.fromRadians(y2));
@@ -899,159 +846,5 @@ public class Miraikan extends PApplet {
 	              System.getProperty("user.dir"));
 	  }
 
-	private void repelNodes(Node n1, Node n2) {
-		
-		if (n1 != n2) {
-			double mindistance = 0.01;
-			double sqDistance = Math.max(Vector.sqDistance(n1.pos, n2.pos), mindistance);
-			if (sqDistance < maxDistance) {
-				Vector d = Vector.subtract(n2.pos, n1.pos);
-				
-				float d1 = (float) (diameter*n1.getSize()*0.5);
-				float d2 = (float) (diameter*n2.getSize()*0.5);
-				
-				d.mult(repelFactor * d1 * d2 / sqDistance); 
-				n2.pos.add(d);
-				n1.pos.subtract(d);
-			}
-		}
-	}
-
-	private Grid makeGrid(Node[]  nodes, int gridx, int gridy) {
-		Grid grid = new Grid();
-	
-		for (Node n : nodes) {
-			int nx = (int) (Math.max(0,Math.min(wScreen - 1, n.pos.x) * gridx / (float) wScreen));
-			int ny = (int) (Math.max(0,Math.min(hScreen - 1, n.pos.y) * gridy / (float) hScreen));
-			grid.addNode(nx,ny, n);
-		}
-		return grid;
-	}
-
-	/**
-	 * make edges of the screen repel nodes (for force-based mode)
-	 * 
-	 * @param nodes
-	 */
-	private void boundary(Node[]  nodes) {
-		float r = maxY / 2;
-		double rep = repelFactor/5f;
-		for (Node n : nodes) {
-			if (n.pos.x > maxX - r)
-				n.pos.x -= rep * 0.5 * (n.pos.x - (maxX - r));
-			if (n.pos.x < r)
-				n.pos.x += rep * 0.5 * (r - n.pos.x);
-			if (n.pos.y > maxY - r)
-				n.pos.y -= rep * (n.pos.y - (maxY - r));
-			if (n.pos.y < r)
-				n.pos.y += rep * (r - n.pos.y);
-		}
-	}
-
-	private void loadImg(String inputimg) {
-		PImage image = loadImage(inputimg);
-		cols = image.width;
-		
-		float wf = wScreen / (float)image.width;
-		float hf = hScreen / (float)image.height;
-		
-		diameter = wf;
-		minX=0;
-		maxX=wScreen;
-		minY=0;
-		maxY=wf*image.height;
-		
-		HashMap<Integer, Cluster> map = new HashMap<Integer, Cluster>();
-		int ignore = this.color(0, 0, 0);
-		for (int i = 0; i < image.width; i++) {
-			for (int j = 0; j < image.height; j++) {
-				int r = (int) red(image.get(i, j));
-				int g = (int) green(image.get(i, j));
-				int b = (int) blue(image.get(i, j));
-				int color = this.color(r, g, b);
-				if (color != ignore) {
-					Cluster c;
-					if (map.containsKey(color)) {
-						c = map.get(color);
-					} else {
-						c = new Cluster(color + "", color);
-						map.put(color, c);
-					}
-					int x = (int) (i * wf+diameter/2f);
-					int y = (int) (j * wf+diameter/2f);
-					Node n = c.addNode(x, y);
-					//n.setSize(Math.random()*2);
-					n.setSize(1);
-				}
-			}
-		}
-		registerLists(map);
-	}
-
-	/**
-	 * set up node placements in the bar-chart
-	 * 
-	 * @param nodes
-	 */
-	private void horizontal(Node[] nodes) {
-		{
-			int cn = clusters.length;
-			int maX = (int) (maxX / diameter);
-			int maY = (int) (maxY / diameter);
-	
-			int y = 1;
-			for (int i = 0; i < cn; i++) {
-				int x = 0;
-				Cluster c = clusters[i];
-				Iterator<Node> n = c.nodes.iterator();
-				while (n.hasNext()) {
-					Node node = n.next();
-					node.goal = new Vector(x * diameter, y * diameter);
-					x++;
-					if (x >= maX) {
-						x = 0;
-						y++;
-					}
-				}
-				y++;
-			}
-		}
-	
-		moveToGoal(nodes);
-		renderNodes(nodes);
-	}
-
-	/**
-	 * set up node placements horizontally
-	 * 
-	 * @param nodes
-	 */
-	private void histogram(Node[] nodes) {
-		{
-			//compare first by x, then by cluster, then by size 
-			
-			List<Node> n = new ArrayList<Node>();
-			for (Node nn:nodes) n.add(nn);
-	
-			//Collections.sort(n, cmpX);
-	
-			double column=0,vert=diameter;
-			Iterator<Node> i = n.iterator();
-			while (i.hasNext()) {
-				Node next = i.next();
-				if (column==next.goal.x) {
-					vert += (float) (diameter*next.getSize());
-				}
-				else {
-					column = next.goal.x;
-					vert = (float) (diameter*next.getSize());
-				}
-				next.goal.y = vert;
-			}
-		}
-	
-		moveToGoal(nodes);
-		renderNodes(nodes);
-	}
-
 }
+	

@@ -65,13 +65,9 @@ public class Cluster {
 		center.y = yavg;
 	}
 
-	public void attractNodes(double attractFactor, boolean rad) {
-		double t; //treshhold before attract is active
-		if (rad) {
-			t = 0.01;
-		} else
-			t = 0.5;
-		
+	public void attractNodes(double attractFactor) {
+		double t = 0.01; //treshhold before attract is active
+	
 		for (Node n:nodes) {
 			Vector d = Vector.subtract(center, n.pos);
 			double magnitude = d.sqMagnitude();
@@ -87,11 +83,8 @@ public class Cluster {
 		center.x=i;
 		center.y=h;
 	}
-	
-	
 
 	public void repelNodes(double repelFactor, double maxDistance, double diameter, double mindistance) {
-
 		for (Node n1 : nodes) {
 			for (Node n2 : nodes) {
 				if (n1 != n2) {
