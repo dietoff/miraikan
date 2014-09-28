@@ -739,16 +739,10 @@ public class Miraikan extends PApplet {
 		case 'e':
 			start = frameCount;
 			loadTblRad(tblfile, "mineral_sum", 0xff666666, 1,2,5f);
+			//loadTblRad(tblfile, "inv_acc_mean", 0xffbbff00, 0,2,1.4f);
+//			loadTblRad(tblfile, "acc_mean", 0xffbbff00, 1,2,1.4f);
 			break;
 		case 'r':
-			start = frameCount;
-			loadTblRad(tblfile, "acc_mean", 0xffbbff00, 1,2,1.4f);
-			break;
-		case 't':
-			start = frameCount;
-			loadTblRad(tblfile, "inv_acc_mean", 0xffbbff00, 0,2,1.4f);
-			break;
-		case 'y':
 			counter ++;
 			counter = 1+counter%12;
 			clusters=new Cluster[0];
@@ -756,30 +750,23 @@ public class Miraikan extends PApplet {
 			start = frameCount;
 			loadImgRad("data/rain/"+counter+".png", true); 
 			break;
-		case 'z':
-			break;
 		case '0':
 			start = frameCount;
-			inputimg = "data/veg90.png";
+			inputimg = "data/100_night.png";
 			loadImgRad(inputimg, false); 
 			break;
-		case '6':
-			start = frameCount;
-			inputimg = "data/63prc_500.png";
-			loadImgRad(inputimg, false); 
-			break;
-		case '8':
+		case '9':
 			start = frameCount;
 			inputimg = "data/250_night.png";
 			loadImgRad(inputimg, false); 
 			break;
-		case '9':
+		case '8':
 			start = frameCount;
 			inputimg = "data/500_night.png";
 			stack = false;
 			loadImgRad(inputimg, false); 
 			break;
-		case '5':
+		case '6':
 			start = frameCount;
 			inputimg = "data/veg_cities.png";
 			loadImgRad(inputimg, false); 
@@ -800,7 +787,7 @@ public class Miraikan extends PApplet {
 		case 'x':
 			rec = !rec;
 			break;
-		case 's':
+		case 'z':
 			//repelFactor = 0.45f* attractFactor;
 			for (Node n:nodes) n.setSize(Math.random());
 			break;
