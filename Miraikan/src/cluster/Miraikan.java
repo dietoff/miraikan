@@ -71,6 +71,17 @@ public class Miraikan extends PApplet {
 			return comp;
 		}
 	};
+	
+	Comparator<Integer> compC = new Comparator<Integer>() {
+		public int compare(Integer c1, Integer c2) {
+			int b1 = (int) (p.red(c1)+p.green(c1)+p.blue(c1)); // (unscientific) way to get absolute brightness
+			int b2 = (int) (p.red(c2)+p.green(c2)+p.blue(c2));
+			int comp = b2-b1; // sort from bright to dark
+			if (comp == 0)	comp = c2-c1; // same brightness, sort by numerical color value
+			return comp;
+		}
+	};
+	
 	private Miraikan p;
 	private boolean stack = true;
 
@@ -245,11 +256,22 @@ public class Miraikan extends PApplet {
 
 	private void registerNodes(HashMap<Integer, Cluster> map) {
 		clusters = map.values().toArray(new Cluster[0]);
+		
 		ArrayList<Node> ntmp = new ArrayList<Node>();
+		ArrayList<Integer> colors = new ArrayList<Integer>();
+		
 		for (int i = 0; i < clusters.length; i++) {
 			ntmp.addAll(clusters[i].nodes);
+			colors.add(clusters[i].color);
 		}
 		Collections.sort(ntmp, comp);
+		Collections.sort(colors,compC);
+		
+		for (int i = 0;i<clusters.length; i++) {
+			Integer col = colors.get(i);
+			clusters[i] = map.get(col);
+		}
+		
 		nodes = ntmp.toArray(new Node[0]);
 		setTransparent();
 	}
