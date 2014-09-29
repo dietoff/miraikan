@@ -32,7 +32,7 @@ public class Miraikan extends PApplet {
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
 	private static String inputimg = "data/250_night.png";
 	boolean rec = false;
-	int wScreen = 1000;
+	int wScreen = 500;
 	int hScreen = (int)(wScreen*1.5);
 
 	double wCoord,hCoord;
@@ -165,8 +165,8 @@ public class Miraikan extends PApplet {
 		}
 		diameter = maxX / (float)cols;
 		HashMap<Integer,Cluster> map = new HashMap<Integer, Cluster>();
-		for (int i=0; i< clusters.length; i++)  map.put(i, clusters[i]);
-		map.put(clusters.length, c);
+		for (int i=0; i< clusters.length; i++)  map.put(clusters[i].color, clusters[i]);
+		map.put(c.color, c);
 		registerNodes(map);
 		//Cluster[] cl = {c};
 		//clusters = cl;
