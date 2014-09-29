@@ -27,7 +27,7 @@ import processing.data.TableRow;
 import processing.pdf.*;
 
 public class Miraikan extends PApplet {
-//	private static final double cutoff_lat = 85.0511; // dont consider pixels north of this latitude
+	//	private static final double cutoff_lat = 85.0511; // dont consider pixels north of this latitude
 	private static double cutoff_lat = 88.97; // dont consider pixels north of this latitude
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
 	private static String inputimg = "data/250_night.png";
@@ -36,23 +36,20 @@ public class Miraikan extends PApplet {
 	int hScreen = (int)(wScreen*1.5);
 
 	double wCoord,hCoord;
-	
+
 	float diameter; // pixel size determined once image is loaded
-	
+
 	// physics properties undistorted
 	double attractFactor = 0.1; // attract strength between nodes
 	double repelFactor = 0.45 * attractFactor; // repel strength between nodes
-	double maxDistance = wScreen*wScreen/36; // don't repel beyond this squared distance
 	double maxDistanceM = PI*PI/16; // don't repel beyond this squared distance
-	
+
 	private Cluster[] clusters;
 	private Node[] nodes;
-	//private PImage image;
-	
+
 	float minX,maxX;
 	float minY,maxY;
-	
-//	private boolean rad = true; // use radians (mercator mode)
+
 	private boolean cluster = false;
 	private int cols;
 	private String tblfile = "data/1deg_grid.csv";
@@ -61,48 +58,16 @@ public class Miraikan extends PApplet {
 	private int start=0;
 
 
-	Comparator<Node> cmpY = new Comparator<Node>() {
-	      public int compare(Node o1, Node o2) {
-	        int comp = Double.valueOf(Math.abs(o1.pos.y)).compareTo(Double.valueOf(Math.abs(o2.pos.y)));
-	        if (comp == 0)  comp = o1.getParent().color-o2.getParent().color;
-	        if (comp == 0)	comp = -Double.valueOf(o1.getSize()).compareTo(Double.valueOf(o2.getSize()));
-	        return comp;
-	      }
-	};
-
-
-	Comparator<Node> cmpX = new Comparator<Node>() {
-	      public int compare(Node o1, Node o2) {
-	        int comp = Double.valueOf(o1.pos.x).compareTo(Double.valueOf(o2.pos.x)); // dirty hack TODO
-	        if (comp == 0)  comp = o1.getParent().color-o2.getParent().color;
-	        if (comp == 0)	comp = -Double.valueOf(o1.getSize()).compareTo(Double.valueOf(o2.getSize()));
-	        return comp;
-	      }
-	};
-
-	Comparator<Node> cmpColor = new Comparator<Node>() {
+	Comparator<Node> comp = new Comparator<Node>() {
 		public int compare(Node o1, Node o2) {
 			int c1 = o1.getParent().color;
 			int c2 = o2.getParent().color;
-			int b1 = (int) (p.red(c1)+p.green(c1)+p.blue(c1));
+			int b1 = (int) (p.red(c1)+p.green(c1)+p.blue(c1)); // (unscientific) way to get absolute brightness
 			int b2 = (int) (p.red(c2)+p.green(c2)+p.blue(c2));
-			int comp = b2-b1;
-			if (comp == 0)	comp = c2-c1;
-			if (comp == 0)  comp = Double.valueOf(Math.abs(o1.origin.x)).compareTo(Double.valueOf(Math.abs(o2.origin.x)));
-			if (comp == 0)	comp = -Double.valueOf(o1.getSize()).compareTo(Double.valueOf(o2.getSize()));
-			return comp;
-		}
-	};
-	Comparator<Node> cmpColorSize = new Comparator<Node>() {
-		public int compare(Node o1, Node o2) {
-			int c1 = o1.getParent().color;
-			int c2 = o2.getParent().color;
-			int b1 = (int) (p.red(c1)+p.green(c1)+p.blue(c1));
-			int b2 = (int) (p.red(c2)+p.green(c2)+p.blue(c2));
-			int comp = b2-b1;
-			if (comp == 0)	comp = c2-c1;
-			if (comp == 0)	comp = -Double.valueOf(o1.getSize()).compareTo(Double.valueOf(o2.getSize()));
-			if (comp == 0)  comp = Double.valueOf(Math.abs(o1.origin.x)).compareTo(Double.valueOf(Math.abs(o2.origin.x)));
+			int comp = b2-b1; // sort from bright to dark
+			if (comp == 0)	comp = c2-c1; // same brightness, sort by numerical color value
+			if (comp == 0)	comp = -Double.valueOf(o1.getSize()).compareTo(Double.valueOf(o2.getSize())); // if same, sort by size
+			if (comp == 0)  comp = Double.valueOf(Math.abs(o1.origin.x)).compareTo(Double.valueOf(Math.abs(o2.origin.x))); // if same, sort by pos
 			return comp;
 		}
 	};
@@ -112,80 +77,92 @@ public class Miraikan extends PApplet {
 	public void setup() {
 		p = this;
 		size(wScreen, hScreen,P3D);
-		 loadImgRad(inputimg, false);
+		smooth();
+		noStroke();
+		blendMode(ADD);
 		
-		for (int i=0;i<clusters.length; i++) println("color:" + clusters[i].color + ", " +clusters[i].nodes.size());
-		println("tot. n. nodes:"+ nodes.length);
+		loadBitmap(inputimg, false);
+
+		
 	}
 
-	private void loadTblRad(String file, String name, int color, double cutoff, int mode, float factor) { // mode: 1 - linear, 2- sqrt, 3-log10
+	private void report() {
+		int n = nodes.length;
+		for (int i=0;i<clusters.length; i++) {
+			int size = clusters[i].nodes.size();
+			println("color\t" + (int)p.red(clusters[i].color)+","+  (int)p.green(clusters[i].color)+","+  (int)p.blue(clusters[i].color) + "\t" +size+"\t"+size/(float)n);
+		}
+		println("tot. n. nodes:"+ n);
+	}
+
+	private void loadTable(String file, String name, int color, double cutoff, int mode, float factor) { // mode: 1 - linear, 2- sqrt, 3-log10
 		Table table = loadTable(file,"header");
 		Cluster c = new Cluster(color + "", color);
 		double radFactor = PI/180.0; // for conversion
-		
+
 		double[] ctmp = table.getDoubleColumn("x");
 		HashMap<Double, Double> tmp = new HashMap<Double,Double>();
 		for (Double dd:ctmp) tmp.put(dd, dd);
 		cols = tmp.keySet().size();
-		
+
 		minX = minY = Float.MAX_VALUE;
 		maxX = maxY = Float.MIN_VALUE;
-		
+
 		// determine max / min
 		double[] col = table.getDoubleColumn(name);
 		ArrayList<Double> t = new ArrayList<Double>();
 		for (double d:col) t.add(d);
 		Collections.sort(t);
 		int percentile = (int) (t.size()*.999); // to get rid of extreme outliers on the max end
-		 Object[] array = t.toArray();
+		Object[] array = t.toArray();
 		Double dd = t.get(percentile);
-		
+
 		float min = 0;
 		float max = (float) (dd*1.0f);
-		
+
 		for (TableRow r:table.rows()) {
 			double x = r.getDouble("x")*radFactor+PI;
 			double y = r.getDouble("y")*radFactor;
-			
+
 			if (x < minX) minX = (float) x;
 			if (y < minY) minY = (float) y;
 			if (x > maxX) maxX = (float) x;
 			if (y > maxY) maxY = (float) y;
-			
+
 			float val = r.getFloat(name);
 			if (val>cutoff){
-			Node n = c.addNode(x, y);
-			n.goal = new Vector(x, y);
-			n.origin = new Vector(x, y);
-			
-			
-			float valN;
-			switch (mode){
-			case 2:
-			valN = map(val, min, max, 0f, 1f);
-			n.setSize(Math.sqrt(valN)*factor);
-			case 3:
-			valN = map(val, min, max, 1f, 10f);
-			n.setSize(Math.log10(valN)*factor);
-			break;
-			default:
-			valN = map(val, min, max, 0f, 1f);
-			n.setSize(valN*factor);
-			break;
-			}
+				Node n = c.addNode(x, y);
+				n.goal = new Vector(x, y);
+				n.origin = new Vector(x, y);
+
+
+				float valN;
+				switch (mode){
+				case 2:
+					valN = map(val, min, max, 0f, 1f);
+					n.setSize(Math.sqrt(valN)*factor);
+				case 3:
+					valN = map(val, min, max, 1f, 10f);
+					n.setSize(Math.log10(valN)*factor);
+					break;
+				default:
+					valN = map(val, min, max, 0f, 1f);
+					n.setSize(valN*factor);
+					break;
+				}
 			}
 		}
 		diameter = maxX / (float)cols;
 		HashMap<Integer,Cluster> map = new HashMap<Integer, Cluster>();
 		for (int i=0; i< clusters.length; i++)  map.put(i, clusters[i]);
 		map.put(clusters.length, c);
-		registerLists(map);
+		registerNodes(map);
 		//Cluster[] cl = {c};
 		//clusters = cl;
 		//nodes = c.nodes.toArray(new Node[0]);
 	}
-	
-	private void loadImgRad(String inputimg, boolean brightness) {
+
+	private void loadBitmap(String inputimg, boolean brightness) {
 		PImage image = loadImage(inputimg);
 		minX=0;
 		maxX=2*PI;
@@ -193,45 +170,45 @@ public class Miraikan extends PApplet {
 		maxY=-PI/2;
 		diameter = maxX / (float)image.width;
 		cols = image.width;
-	
+
 		HashMap<Integer, Cluster> map = new HashMap<Integer, Cluster>();
 		int ignore = this.color(0, 0, 0);
-		
+
 		double e = 90-cutoff_lat;
 		double d = image.height*e/180f;
-		
+
 		double i = d;
 		while (i < image.height-d) { // offset at the poles
-			
+
 			double degY = 90-i*180/(double)image.height;
 			double radY = Math.toRadians(degY); // calc y in radians
 			double dotWidth=0;
 			double j = 0;
 			while (j< image.width - dotWidth) {
-				 dotWidth = 1/Math.cos(radY); // dot width through mercator local distortion factor
-				 j += dotWidth/2; // make sure edge of the dot is inside screen (left edge)
-				
+				dotWidth = 1/Math.cos(radY); // dot width through mercator local distortion factor
+				j += dotWidth/2; // make sure edge of the dot is inside screen (left edge)
+
 				double rest = image.width%dotWidth; // how much space left after fitting an int nr of dots?
 				double nrDots = (int) (image.width/dotWidth);
 				double addSpacing = 0;
 				if (nrDots>0) addSpacing = rest/nrDots; // we will add that later to have envely spaced dots betw. the edges
-				
+
 				double degX = j*360/(double)image.width; // we go from 0 to 360 instead of -180 to 180 to make calculations easier
 				double radX = Math.toRadians(degX); // calc x in radians
-	
+
 				int color=0;
 				float size=1;
 				if (brightness) {
 					size = brightness(image.get((int)j, (int)i))/255.0f;
 					color = this.color(255);
-					
+
 				} else {
 					int r = (int) red(image.get((int)j, (int)i));
 					int g = (int) green(image.get((int)j, (int)i));
 					int b = (int) blue(image.get((int)j, (int)i));
 					color = this.color(r, g, b);
 				}
-	
+
 				if (color != ignore) {
 					Cluster c;
 					if (map.containsKey(color)) {
@@ -242,18 +219,19 @@ public class Miraikan extends PApplet {
 					}
 					double x = radX;
 					double y = radY;
-					
+
 					Node n = c.addNode(x, y);
 					//n.setSize(Math.random());
 					n.setSize(size);
-					
+
 				}
 				j +=(dotWidth/2+addSpacing);
 			}
 			i++;
 		}
-		
-		registerLists(map);
+
+		registerNodes(map);
+		report();
 	}
 
 	private void setTransparent(){
@@ -264,39 +242,34 @@ public class Miraikan extends PApplet {
 			n.col = this.color(r,g,b,0);
 		}
 	}
-	
-	private void registerLists(HashMap<Integer, Cluster> map) {
+
+	private void registerNodes(HashMap<Integer, Cluster> map) {
 		clusters = map.values().toArray(new Cluster[0]);
 		ArrayList<Node> ntmp = new ArrayList<Node>();
 		for (int i = 0; i < clusters.length; i++) {
 			ntmp.addAll(clusters[i].nodes);
 		}
-		Collections.sort(ntmp, cmpColor);
+		Collections.sort(ntmp, comp);
 		nodes = ntmp.toArray(new Node[0]);
 		setTransparent();
 	}
-	
-	private void sortLists(Comparator cmp) {
-		ArrayList<Node> ntmp = new ArrayList<Node>();
-		for (int i = 0; i < clusters.length; i++) {
-			ntmp.addAll(clusters[i].nodes);
-		}
-		Collections.sort(ntmp, cmp);
-		nodes = ntmp.toArray(new Node[0]);
-	}
 
-	
+
 	public void draw() {
-		blendMode(ADD);
+		background(0);
+
 		if (rec)
 			beginRecord(PDF, exportfile);
 
 		switch (mode) {
 		case 'v': // sort horizontal
-			histogramRad(nodes);
+			histogram(nodes);
 			break;
 		case 'h':
-			horizontalRad(nodes); 
+			horizontalBands(nodes); 
+			break;
+		case 'b':
+			bars(nodes); //bar
 			break;
 		case 'm':
 			map(nodes); //map
@@ -307,7 +280,7 @@ public class Miraikan extends PApplet {
 		}
 
 		if (rec) {
-			 endRecord();
+			endRecord();
 			//saveFrame(exportfile);
 			//rec = false;
 		}
@@ -318,46 +291,43 @@ public class Miraikan extends PApplet {
 	 * TODO lots of them
 	 * @param nodes
 	 */
-	private void horizontalRad(Node[] nodes) {
+	private void horizontalBands(Node[] nodes) {
 		if (nodes.length ==0) return;
 		List<Node> l = new ArrayList<Node>();
 		for (Node nn:nodes) l.add(nn);
 
-		//Collections.sort(l, cmpColor);
-		
-			double y = Math.toRadians(25); //starting near the top
-			Iterator<Node> n = l.iterator();
-			Node node = l.get(0);
-				float x = 0;
-				while (n.hasNext()) {
-					node = n.next();
-					
-					double mercDia = mercatorDiameter(y, diameter);
-					node.goal = new Vector(x * mercDia+mercDia/2, y);
-					double d = maxX/mercDia;
-					double g = d/(int)d;
-					x+=g;
-					if (x > d-0.9 ) {
-						x = 0;
-						y -= diameter;
-					}
-				}
+		double y = Math.toRadians(25); //starting near the top
+		Iterator<Node> n = l.iterator();
+		float x = 0;
+		while (n.hasNext()) {
+			Node node = n.next();
+
+			double mercDia = mercatorDiameter(y, diameter);
+			node.goal = new Vector(x * mercDia+mercDia/2, y);
+			double d = maxX/mercDia;
+			double g = d/(int)d;
+			x+=g;
+			if (x > d-0.9 ) {
+				x = 0;
+				y -= diameter;
+			}
+		}
 
 		moveToGoal(nodes);
-		renderNodesRad(nodes);
+		renderNodes(nodes);
 	}
-	
-	
-/**
-	 * set up node placements horizontally
+
+
+	/**
+	 * stack nodes by color keeping original x coordinate
 	 * 
 	 * @param nodes
 	 */
-	private void histogramRad(Node[] nodes) {
+	private void histogram(Node[] nodes) {
 		if (nodes.length ==0) return;
 		int slots = (int) (cols*.75);
 		HashMap<Integer,ArrayList<Node>> hist = new HashMap<Integer,ArrayList<Node>>();
-		
+
 		// init histogram
 		for (int i = 0; i<slots;i++) {
 			hist.put(i, new ArrayList<Node>()); 
@@ -367,41 +337,80 @@ public class Miraikan extends PApplet {
 			int slot = (int) (nn.origin.x*slots/2/PI);
 			hist.get(slot).add(nn);
 		}
-		
+
 		// sort nodes & display
 		for (int j = 0; j<slots;j++) {
 			ArrayList<Node> ls = hist.get(j);
-			Collections.sort(ls,cmpColorSize);
-			
+			Collections.sort(ls,comp);
+
 			double column= 0,vertN=0, vertS=0;
 			Iterator<Node> i = ls.iterator();
 			int lastCol = 0;
 			while (i.hasNext()) {
 				Node next = i.next();
-				
+
 				if ( !stack  && next.col != lastCol ) {
 					vertN = vertS = 0;
 					lastCol = next.col;
 				}
-				
+
 				next.goal.x = j*PI/slots*2;
-					if (next.origin.y>0) {
-						vertN += diameter*next.getSize()/2;
-						next.goal.y = vertN;
-						vertN += diameter*next.getSize()/2;
-					} else {
-						vertS -= diameter*next.getSize()/2;
-						next.goal.y = vertS;
-						vertS -= diameter*next.getSize()/2;
-					}
+				if (next.origin.y>0) {
+					vertN += diameter*next.getSize()/2;
+					next.goal.y = vertN;
+					vertN += diameter*next.getSize()/2;
+				} else {
+					vertS -= diameter*next.getSize()/2;
+					next.goal.y = vertS;
+					vertS -= diameter*next.getSize()/2;
+				}
 			}
-			
+
 		}
-		
+
 		moveToGoal(nodes);
-		renderNodesRad(nodes);
+		renderNodes(nodes);
 	}
 	
+	private void bars(Node[] nodes) {
+		if (nodes.length ==0) return;
+		int slots = clusters.length;
+		
+		HashMap<Integer,ArrayList<Node>> hist = new HashMap<Integer,ArrayList<Node>>();
+
+		// init bars & fill with nodes
+		for (int i = 0; i<slots;i++) {
+			hist.put(i, new ArrayList<Node>()); 
+			ArrayList<Node> bar = hist.get(i);
+			Cluster cln = clusters[i];
+			bar.addAll(cln.nodes);
+			Collections.sort(bar,comp);
+			
+			Iterator<Node> it = bar.iterator();
+			float y = 0; 
+			float wx = maxX/slots;
+			float sx = wx*i;
+			double x = 0;
+			boolean north = false;
+			while (it.hasNext()) {
+				Node node = it.next();
+				double mercDia = mercatorDiameter(y, diameter);
+				node.goal = new Vector(sx + x * mercDia+mercDia/2, y);
+				double d = wx/mercDia;
+				double g = d/(int)d;
+				x+=g;
+				if (x > wx/mercDia-1) { 
+					x = 0;
+					y*=-1;
+					if (!north) y -= diameter;
+					north = !north;
+				}
+			}
+		}
+		moveToGoal(nodes);
+		renderNodes(nodes);
+	}
+
 
 	/**
 	 * set up node placements in the map
@@ -414,7 +423,7 @@ public class Miraikan extends PApplet {
 				n.goal = new Vector(n.origin.x, n.origin.y);
 
 			moveToGoal(nodes);
-			renderNodesRad(nodes);
+			renderNodes(nodes);
 		}
 	}
 
@@ -427,7 +436,7 @@ public class Miraikan extends PApplet {
 
 		// repel nodes
 		if(cluster) repPerCluster(clusters); else repelOpt(nodes);
-		
+
 		// attract
 		for (int i = 0; i < clusters.length; i++) {
 			Cluster c = clusters[i];
@@ -435,9 +444,9 @@ public class Miraikan extends PApplet {
 			c.attractNodes(attractFactor);// make nodes move tow the cluster center
 		}
 
-		boundaryRad(nodes);  // make borders of the screen repelling
-		
-		renderNodesRad(nodes);  // render our nodes and text
+		boundaryRepel(nodes);  // make borders of the screen repelling
+
+		renderNodes(nodes);  // render our nodes and text
 	}
 
 	private void moveToGoal(Node[] nodes) {
@@ -445,9 +454,9 @@ public class Miraikan extends PApplet {
 		// make nodes move towards their goals, over multiple frames
 		int range = 300;  // larger is slower
 		int df = nodes.length/range; // divides the number of nodes in [range] units, defining the chunk of nodes the loop goes through
-		int f = ((frameCount-start)*df)%nodes.length; // determine start frame based on current frame 
-		int j = 150; // loop through j chunks at the time - larger is faster, less frames
-		for (int i = Math.max(0,f-df*j); i < f+df*j; i++) { // actually start earlier, to allow the first nodes enough time to settle 
+		int f = (frameCount-start)*df; // determine start frame based on current frame 
+		
+		for (int i = 0; i < f*2; i++) {
 			Node n = nodes[i%nodes.length];
 			Vector d = Vector.subtract(n.goal, n.pos);
 			d.mult(.1f);
@@ -455,37 +464,32 @@ public class Miraikan extends PApplet {
 		}
 		fadeIn();
 	}
-	
+
 
 	private void fadeIn() {
-		int range = 50; // larger is slower, more granular
+		int range = 100; // larger is slower, more granular
 		int df = nodes.length/range; 
-		int f = (frameCount-start)*df%nodes.length;
-		int j = 5; // larger is faster, less frames
-		for (int i = Math.max(0,f-df*j); i < f+df*j; i++) {
+		int f = (frameCount-start)*df; // determine start frame based on current frame 
+		for (int i = 0; i < f*2; i++) {
 			Node n = nodes[i%nodes.length];
 			float r = this.red(n.col);
 			float g = this.green(n.col);
 			float b = this.blue(n.col);
-			float a = Math.min(255, this.alpha(n.col)+50); // increase alpha by this
+			float a = Math.min(255, this.alpha(n.col)+25); // increase alpha by this
 			n.col = this.color(r,g,b,a);
 		}
 	}
+
 	
 	private void repPerCluster(Cluster[] clusters2) {
-		double minDistance;
-//		if (rad){
-			minDistance = 0.00001;
-			maxDistance = wScreen/3.0;
-//		}
-//		else{
-//			minDistance = 0.01;
-//			maxDistance = PI/6.0;
-//		}
+		
+		double minDistance = 0.00001;
+		double maxDistance = wScreen/3.0;
 		
 		for (int i = 0; i < clusters.length; i++) {
 			Cluster c = clusters[i];
-			 c.repelNodes(repelFactor, maxDistanceM, diameter, minDistance);// make nodes repel from cluster center
+			Node[] cn = c.nodes.toArray(new Node[0]);
+			repelOpt(cn);
 		}
 		
 		for (int i = 0; i < clusters.length; i++) {
@@ -497,13 +501,48 @@ public class Miraikan extends PApplet {
 					c2.updateCenter();
 
 					double distance = Math.max(Vector.sqDistance(c1.center, c2.center),minDistance);
-					
-					float dia = diameter / 40f;
-				
+					float dia = diameter;
 
 					if (distance < maxDistance) {
 						Vector d = Vector.subtract(c2.center, c1.center);
-						
+						d.mult(repelFactor * dia / distance);
+						for (Node n : c2.nodes) {
+							n.pos.add(d);
+						}
+						for (Node n : c1.nodes) {
+							n.pos.subtract(d);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private void repPerCluster2(Cluster[] clusters2) {
+		double minDistance = 0.00001;
+		double maxDistance = wScreen/3.0;
+
+		for (int i = 0; i < clusters.length; i++) {
+			Cluster c = clusters[i];
+			c.repelNodes(repelFactor, maxDistanceM, diameter, minDistance);// make nodes repel from cluster center
+		}
+
+		for (int i = 0; i < clusters.length; i++) {
+			for (int j = 0; j < clusters.length; j++) {
+				if (i != j) {
+					Cluster c1 = clusters[i];
+					Cluster c2 = clusters[j];
+					c1.updateCenter();
+					c2.updateCenter();
+
+					double distance = Math.max(Vector.sqDistance(c1.center, c2.center),minDistance);
+
+					float dia = diameter / 40f;
+
+
+					if (distance < maxDistance) {
+						Vector d = Vector.subtract(c2.center, c1.center);
+
 						d.mult(repelFactor * dia / distance);
 						for (Node n : c2.nodes) {
 							n.pos.add(d);
@@ -534,15 +573,9 @@ public class Miraikan extends PApplet {
 		gridx = ox - (int) (ox / 2 * d);
 		gridy = oy - (int) (oy / 2 * d);
 
-		// long startTime = System.nanoTime();
-
 		Grid grid;
-		grid = makeGridRad(nodes, gridx, gridy);
+		grid = makeGrid(nodes, gridx, gridy);
 		iterGrid(grid);
-
-		// long endTime = System.nanoTime();
-		// System.out.println("2 execution time: " + (endTime-startTime) +
-		// "ms");
 	}
 
 
@@ -555,9 +588,9 @@ public class Miraikan extends PApplet {
 				for (Cell c:grid.getCells()){
 					double dist = distanceSq(new Vector(cell.x,cell.y), new Vector(c.x,c.y)); //topological distance between cells
 					if (dist <= cutoffdist) {
-						if (dist > precdist) repelCellRad(n, c.nodes);
+						if (dist > precdist) repelCell(n, c.nodes);
 						else {
-							for (Node n2 : c.nodes) repelNodesRad(n, n2);
+							for (Node n2 : c.nodes) repelNodes(n, n2);
 						}
 					}
 				}
@@ -565,7 +598,7 @@ public class Miraikan extends PApplet {
 		}
 	}
 
-	private Grid makeGridRad(Node[]  nodes, int gridx, int gridy) {
+	private Grid makeGrid(Node[]  nodes, int gridx, int gridy) {
 		Grid grid = new Grid();
 
 		for (Node n : nodes) {
@@ -573,28 +606,28 @@ public class Miraikan extends PApplet {
 			int ny = (int) (Math.max(0,Math.min(PI, n.pos.y) * gridy / (float) PI));
 			grid.addNode(nx,ny, n);
 		}
-//		print();
+		//		print();
 		return grid;
 	}
 
-	
-	
-	private void repelNodesRad(Node n1, Node n2) {
+
+
+	private void repelNodes(Node n1, Node n2) {
 		if (n1 != n2) {
 			//float dia1 = (float) (diameter / Math.max(Math.cos((n1.pos.y+n2.pos.y)/2), 0.5)); // don't increase rep. force beyond 60 deg latitude
 			//float dia2 = (float) (diameterRad / Math.max(Math.cos(n2.pos.y), 0.5));
 
 			double mindistance = 0.00001;
 			double distance = Math.max(Vector.sqDistance(n1.pos, n2.pos),mindistance);
-			
+
 			if (distance < maxDistanceM) {
 				Vector d = Vector.subtract(n2.pos, n1.pos);
-				
+
 				float d1 = (float) (diameter*n1.getSize()*0.5);
 				float d2 = (float) (diameter*n2.getSize()*0.5);
-				
+
 				d.mult(repelFactor * d1 * d2 / distance); 
-				
+
 				//d.mult(repelFactor * dia1 * dia1 / 4 / distance);
 				n2.pos.add(d);
 				n1.pos.subtract(d);
@@ -602,7 +635,7 @@ public class Miraikan extends PApplet {
 		}
 	}
 
-	private void repelCellRad(Node n1, List<Node> n2) {
+	private void repelCell(Node n1, List<Node> n2) {
 		if (n2 == null)
 			return;
 
@@ -616,9 +649,9 @@ public class Miraikan extends PApplet {
 		}
 		meanx = meanx / count;
 		meany = meany / count;
-		
+
 		float dia = (float) (diameter / Math.max(Math.cos(meany), 0.5));
-		
+
 		Vector p = new Vector(meanx, meany);
 
 		double minDistance = 0.0001;
@@ -636,65 +669,39 @@ public class Miraikan extends PApplet {
 	 * here we are in lat/long space, PI/2 > y > -PI/2
 	 * @param nodes
 	 */
-	private void boundaryRad(Node[]  nodes) {
+	private void boundaryRepel(Node[]  nodes) {
 		float r = PI/2;
 		double rep = repelFactor/2f;
-		
+
 		for (Node n : nodes) {
 			if (n.pos.x > maxX - r)
 				n.pos.x -= rep * 0.5 * (n.pos.x - (maxX - r));
 			if (n.pos.x < r)
 				n.pos.x += rep * 0.5 *  (r - n.pos.x);
-			
+
 			n.pos.y = Math.min(n.pos.y, PI/2.01);
 			n.pos.y = Math.max(n.pos.y, -PI/2.01);
-			
+
 			float y1 = minY - r;
 			if (n.pos.y > y1)
 				n.pos.y -= rep * (n.pos.y - y1);
 			float y2 = maxY + r;
 			if (n.pos.y < y2) //+r because maxY is negative in radians
 				n.pos.y += rep * (-n.pos.y + y2);
-				
+
 		}
 	}
 
-	/**
-	 * render our nodes to the buffer
-	 * 
-	 * @param nodes
-	 */
 	private void renderNodes(Node[]  nodes) {
-		//background(0, 20, 45);
-		background(0);
-		smooth();
-		noStroke();
 		
 		for (Node n : nodes) {
-			int col = n.col;
-			int a = 0xddffffff;
-			float size = (float) ((float) diameter * n.getSize());
-			fill(col & a);
-			ellipse((float) n.pos.x, (float) n.pos.y, size, size);
-		}
-	}
-	private void renderNodesRad(Node[]  nodes) {
-		//transform to mercator first!
-		//background(0, 20, 45);
-		background(0);
-		smooth();
-		noStroke();
-		for (Node n : nodes) {
-			//int col = n.col;
-			//int a = 0xddffffff;
-			//fill(col & a);
 			fill(n.col);
 			float newx = (float) n.pos.x; // starts at 0, ends at 2pi
 			newx = (float) (newx*wScreen/(Math.PI*2f)); // convert back to screen units
 			float size = (float) n.getSize();
 			float newy = (float) mercLat2Y(n.pos.y);
 			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size / (float)cols);
-			
+
 			ellipse(newx,newy,newDia,newDia);
 		}
 	}
@@ -707,40 +714,35 @@ public class Miraikan extends PApplet {
 		case '1':
 			mode = 'v';
 			start = frameCount;
-			sortLists(cmpColor);
 			break;
 		case '2':
 			mode = 'h';
 			start = frameCount;
-			sortLists(cmpColorSize);
 			break;
 		case '3':
-			mode = 'f';
+			mode = 'b';
+			start = frameCount;
 			break;
 		case '4':
+			mode = 'f';
+			break;
+		case '5':
 			mode = 'm';
 			start = frameCount;
 			break;
 		case 'q':
 			start = frameCount;
-			loadTblRad(tblfile, "pop_sum", 0xffffffff, 250000,2,1.3f);
-//			clusters = new Cluster[]{clusters[0]};
-//
-//			ArrayList<Node> ntmp = new ArrayList<Node>();
-//			for (int i = 0; i < clusters.length; i++) {
-//				ntmp.addAll(clusters[i].nodes);
-//			}
-//			nodes = ntmp.toArray(new Node[0]);
+			loadTable(tblfile, "pop_sum", 0xffffffff, 250000,2,1.3f);
 			break;
 		case 'w':
 			start = frameCount;
-			loadTblRad(tblfile, "water_sum", 0xff33bbff, 1000,2,1);
+			loadTable(tblfile, "water_sum", 0xff33bbff, 1000,2,1);
 			break;
 		case 'e':
 			start = frameCount;
-			loadTblRad(tblfile, "mineral_sum", 0xff666666, 1,2,5f);
+			loadTable(tblfile, "mineral_sum", 0xff666666, 1,2,5f);
 			//loadTblRad(tblfile, "inv_acc_mean", 0xffbbff00, 0,2,1.4f);
-//			loadTblRad(tblfile, "acc_mean", 0xffbbff00, 1,2,1.4f);
+			//loadTblRad(tblfile, "acc_mean", 0xffbbff00, 1,2,1.4f);
 			break;
 		case 'r':
 			counter ++;
@@ -748,34 +750,34 @@ public class Miraikan extends PApplet {
 			clusters=new Cluster[0];
 			nodes = new Node[0];
 			start = frameCount;
-			loadImgRad("data/rain/"+counter+".png", true); 
+			loadBitmap("data/rain/"+counter+".png", true); 
 			break;
 		case '0':
 			start = frameCount;
 			inputimg = "data/100_night.png";
-			loadImgRad(inputimg, false); 
+			loadBitmap(inputimg, false); 
 			break;
 		case '9':
 			start = frameCount;
 			inputimg = "data/250_night.png";
-			loadImgRad(inputimg, false); 
+			loadBitmap(inputimg, false); 
 			break;
 		case '8':
 			start = frameCount;
-			inputimg = "data/500_night.png";
+			inputimg = "data/500_fullMap_u.png";//500_night - 500_fullMap - urbanExtent - 500_fullMap_u
 			stack = false;
-			loadImgRad(inputimg, false); 
+			loadBitmap(inputimg, false); 
 			break;
 		case '6':
 			start = frameCount;
 			inputimg = "data/veg_cities.png";
-			loadImgRad(inputimg, false); 
+			loadBitmap(inputimg, false); 
 			break;
 		case '7':
 			start = frameCount;
 			inputimg = "data/access2.png";
 			stack = true;
-			loadImgRad(inputimg, false);
+			loadBitmap(inputimg, false);
 			break;
 		case '-':
 			clusters=new Cluster[0];
@@ -787,19 +789,10 @@ public class Miraikan extends PApplet {
 		case 'x':
 			rec = !rec;
 			break;
-		case 'z':
-			//repelFactor = 0.45f* attractFactor;
-			for (Node n:nodes) n.setSize(Math.random());
+		case 'v':
+			stack = !stack;
 			break;
 		}
-	}
-
-	private void randomize() {
-		for(Cluster c:clusters) 
-			for (Node n:c.nodes) {
-				n.pos.x += 10*(Math.random()-0.5);
-				n.pos.y += 10*(Math.random()-0.5);
-			}
 	}
 
 	private double distanceSq(Vector a, Vector b) {
@@ -807,7 +800,7 @@ public class Miraikan extends PApplet {
 		double dy = a.y - b.y;
 		return dx*dx+dy*dy;
 	}
-	
+
 	private double mercLat2Y(double rad) { // in radians
 		double mercY = Math.log(Math.tan(PI/4+rad/2));
 		double mercMax = Math.log(Math.tan(PI/4+Math.toRadians(cutoff_lat)/2)); //start at 85.0511 deg for a square map
@@ -819,19 +812,19 @@ public class Miraikan extends PApplet {
 	private double mercatorDiameter(double y, float diameter) {
 		return Math.abs((1/Math.cos(y)*diameter));
 	}
-	
+
 	private LatLon greatCircle(double prc, double x1, double y1, double x2, double y2) {
 		LatLon pos1 = new LatLon(Angle.fromRadians(x1), Angle.fromRadians(y1));
 		LatLon pos2 = new LatLon(Angle.fromRadians(x2), Angle.fromRadians(y2));
 		LatLon interPoint = LatLon.interpolateGreatCircle(prc, pos1, pos2);
 		return interPoint;
 	}
-	
+
 	public static void main(String args[]) {
-	    PApplet.main(new String[] { "cluster.Miraikan" });
-	    System.out.println("Working Directory = " +
-	              System.getProperty("user.dir"));
-	  }
+		PApplet.main(new String[] { "cluster.Miraikan" });
+		System.out.println("Working Directory = " +
+				System.getProperty("user.dir"));
+	}
 
 }
-	
+
