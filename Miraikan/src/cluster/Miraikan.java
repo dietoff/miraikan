@@ -30,9 +30,9 @@ public class Miraikan extends PApplet {
 	//	private static final double cutoff_lat = 85.0511; // dont consider pixels north of this latitude
 	private static double cutoff_lat = 88.97; // dont consider pixels north of this latitude
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
-	private static String inputimg = "data/250_night.png";
+	private static String inputimg = "data/360_landuse_orig.png";//360_landuse_blue
 	boolean rec = false;
-	int wScreen = 500;
+	int wScreen = 900;
 	int hScreen = (int)(wScreen*1.5);
 
 	double wCoord,hCoord;
@@ -50,7 +50,7 @@ public class Miraikan extends PApplet {
 	float minX,maxX;
 	float minY,maxY;
 
-	private boolean cluster = false;
+	private boolean cluster = true;
 	private int cols;
 	private String tblfile = "data/1deg_grid.csv";
 	private char mode ='m';
@@ -90,7 +90,7 @@ public class Miraikan extends PApplet {
 		size(wScreen, hScreen,P3D);
 		smooth();
 		noStroke();
-		blendMode(ADD);
+		//blendMode(ADD);
 		
 		loadBitmap(inputimg, false);
 
@@ -99,7 +99,7 @@ public class Miraikan extends PApplet {
 
 	private void report() {
 		int n = nodes.length;
-		for (int i=0;i<clusters.length; i++) {
+		for (int i=0;i<clusters.length; i++) {	
 			int size = clusters[i].nodes.size();
 			println("color\t" + (int)p.red(clusters[i].color)+","+  (int)p.green(clusters[i].color)+","+  (int)p.blue(clusters[i].color) + "\t" +size+"\t"+size/(float)n);
 		}
@@ -278,10 +278,11 @@ public class Miraikan extends PApplet {
 
 
 	public void draw() {
-		background(0);
-
-		if (rec)
-			beginRecord(PDF, exportfile);
+		if (rec) beginRecord(PDF, exportfile);
+		//background(220,50,070);
+		background(10,30,70);
+		noStroke();
+		blendMode(BLEND);
 
 		switch (mode) {
 		case 'v': // sort horizontal
@@ -300,11 +301,10 @@ public class Miraikan extends PApplet {
 			force(nodes); // free forces
 			break;
 		}
-
+		
 		if (rec) {
 			endRecord();
-			//saveFrame(exportfile);
-			//rec = false;
+			rec = false;
 		}
 	}
 
@@ -497,7 +497,7 @@ public class Miraikan extends PApplet {
 			float r = this.red(n.col);
 			float g = this.green(n.col);
 			float b = this.blue(n.col);
-			float a = Math.min(255, this.alpha(n.col)+25); // increase alpha by this
+			float a = Math.min(200, this.alpha(n.col)+25); // increase alpha by this
 			n.col = this.color(r,g,b,a);
 		}
 	}
@@ -715,15 +715,18 @@ public class Miraikan extends PApplet {
 	}
 
 	private void renderNodes(Node[]  nodes) {
-		
-		for (Node n : nodes) {
+		for (int i = nodes.length-1; i>=0; i--) {
+			Node n = nodes[i];
+//		for (Node n : nodes) {
+			stroke(n.col);
+			strokeWeight(0.5f);
 			fill(n.col);
 			float newx = (float) n.pos.x; // starts at 0, ends at 2pi
 			newx = (float) (newx*wScreen/(Math.PI*2f)); // convert back to screen units
 			float size = (float) n.getSize();
 			float newy = (float) mercLat2Y(n.pos.y);
-			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size / (float)cols);
-
+			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size *.90f / (float)cols);
+			
 			ellipse(newx,newy,newDia,newDia);
 		}
 	}
@@ -776,17 +779,17 @@ public class Miraikan extends PApplet {
 			break;
 		case '0':
 			start = frameCount;
-			inputimg = "data/100_night.png";
+			inputimg = "data/360_landuse_green.png";
 			loadBitmap(inputimg, false); 
 			break;
 		case '9':
 			start = frameCount;
-			inputimg = "data/250_night.png";
+			inputimg = "data/360_landuse_IR.png";
 			loadBitmap(inputimg, false); 
 			break;
 		case '8':
 			start = frameCount;
-			inputimg = "data/500_fullMap_u.png";//500_night - 500_fullMap - urbanExtent - 500_fullMap_u
+			inputimg = "data/360_landuse_blue.png";//500_night - 500_fullMap - urbanExtent - 500_fullMap_u - 360_landuse_blue
 			stack = false;
 			loadBitmap(inputimg, false); 
 			break;

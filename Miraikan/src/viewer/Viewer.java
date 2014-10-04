@@ -17,10 +17,11 @@ public class Viewer extends PApplet {
 	private int pointer=0;
 	private File[] list;
 	private boolean rec=false;
+	private float rotx = 0f;
 	
 	public void setup(){
-		size(800, 600, P3D);
-		perspective(PI/11, (float)(width)/(float)(height), 
+		size(1600, 1200, P3D);
+		perspective(PI/15, (float)(width)/(float)(height), 
 	            1, 2000);
 		noStroke();
 		
@@ -50,6 +51,7 @@ public class Viewer extends PApplet {
 	public void draw(){
 		background(100);
 		translate(width/2,height/2,-1000);
+		rotate(rotx,1 ,0 , 0);
 		rotate(roty,0 ,1 , 0);
 		//lights();
 		globe.setTexture(img);
@@ -69,7 +71,13 @@ public class Viewer extends PApplet {
 		case '.':
 			roty -=0.1f;
 			break;
+		case 'a':
+			rotx +=0.1f;
+			break;
 		case 'z':
+			rotx -=0.1f;
+			break;
+		case '1':
 			getFile(list);
 			break;
 		case 'x':
