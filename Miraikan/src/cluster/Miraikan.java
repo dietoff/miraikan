@@ -27,10 +27,11 @@ import processing.data.TableRow;
 import processing.pdf.*;
 
 public class Miraikan extends PApplet {
+	private static final int alpha = 200;
 	//	private static final double cutoff_lat = 85.0511; // dont consider pixels north of this latitude
 	private static double cutoff_lat = 88.97; // dont consider pixels north of this latitude
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
-	private static String inputimg = "data/360_landuse_orig.png";//360_landuse_blue
+	private static String inputimg = "data/360_landuse_blue.png";//360_landuse_blue
 	boolean rec = false;
 	int wScreen = 900;
 	int hScreen = (int)(wScreen*1.5);
@@ -152,13 +153,16 @@ public class Miraikan extends PApplet {
 				case 2:
 					valN = map(val, min, max, 0f, 1f);
 					n.setSize(Math.sqrt(valN)*factor);
+					n.setOrigsize(Math.log10(valN)*factor);
 				case 3:
 					valN = map(val, min, max, 1f, 10f);
 					n.setSize(Math.log10(valN)*factor);
+					n.setOrigsize(Math.log10(valN)*factor);
 					break;
 				default:
 					valN = map(val, min, max, 0f, 1f);
 					n.setSize(valN*factor);
+					n.setOrigsize(valN*factor);
 					break;
 				}
 			}
@@ -234,7 +238,7 @@ public class Miraikan extends PApplet {
 					Node n = c.addNode(x, y);
 					//n.setSize(Math.random());
 					n.setSize(size);
-
+					n.setOrigsize(size);
 				}
 				j +=(dotWidth/2+addSpacing);
 			}
@@ -251,6 +255,12 @@ public class Miraikan extends PApplet {
 			float g = this.green(n.col);
 			float b = this.blue(n.col);
 			n.col = this.color(r,g,b,0);
+		}
+	}
+	
+	private void setTiny(){
+		for (Node n:nodes) {
+			n.setSize(0.001);
 		}
 	}
 
@@ -273,7 +283,8 @@ public class Miraikan extends PApplet {
 		}
 		
 		nodes = ntmp.toArray(new Node[0]);
-		setTransparent();
+//		setTransparent();
+		setTiny();
 	}
 
 
@@ -281,7 +292,6 @@ public class Miraikan extends PApplet {
 		if (rec) beginRecord(PDF, exportfile);
 		//background(220,50,070);
 		background(10,30,70);
-		noStroke();
 		blendMode(BLEND);
 
 		switch (mode) {
@@ -484,7 +494,8 @@ public class Miraikan extends PApplet {
 			d.mult(.1f);
 			n.pos.add(d);
 		}
-		fadeIn();
+		//fadeIn();
+		scaleIn();
 	}
 
 
@@ -497,7 +508,23 @@ public class Miraikan extends PApplet {
 			float r = this.red(n.col);
 			float g = this.green(n.col);
 			float b = this.blue(n.col);
-			float a = Math.min(200, this.alpha(n.col)+25); // increase alpha by this
+			float a = Math.min(alpha, this.alpha(n.col)+25); // increase alpha by this
+			n.col = this.color(r,g,b,a);
+		}
+	}
+	
+	private void scaleIn() {
+		int range = 100; // larger is slower, more granular
+		int df = nodes.length/range; 
+		int f = (frameCount-start)*df; // determine start frame based on current frame 
+		for (int i = 0; i < f*2; i++) {
+			Node n = nodes[i%nodes.length];
+			n.setSize(Math.min(n.getOrigsize(),n.getSize()+.05));
+			
+			float r = this.red(n.col);
+			float g = this.green(n.col);
+			float b = this.blue(n.col);
+			float a = alpha; 
 			n.col = this.color(r,g,b,a);
 		}
 	}
@@ -714,10 +741,25 @@ public class Miraikan extends PApplet {
 		}
 	}
 
-	private void renderNodes(Node[]  nodes) {
-		for (int i = nodes.length-1; i>=0; i--) {
+	private void renderNodeBG(Node[]  nodes) {
+		for (int i = nodes.length-1; i>=0; i=i-2) {
 			Node n = nodes[i];
-//		for (Node n : nodes) {
+			noStroke();
+			fill(50,200,255,2);
+			float newx = (float) n.pos.x; // starts at 0, ends at 2pi
+			newx = (float) (newx*wScreen/(Math.PI*2f)); // convert back to screen units
+			float size = (float) n.getSize()*15;
+			float newy = (float) mercLat2Y(n.pos.y);
+			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size *.90f / (float)cols);
+			
+			ellipse(newx,newy,newDia,newDia);
+		}
+	}
+	
+	private void renderNodes(Node[]  nodes) {
+		renderNodeBG(nodes);
+		for (int i = nodes.length-1; i>=0; i--) { // backwards, to prevent overwriting
+			Node n = nodes[i];
 			stroke(n.col);
 			strokeWeight(0.5f);
 			fill(n.col);
@@ -725,8 +767,7 @@ public class Miraikan extends PApplet {
 			newx = (float) (newx*wScreen/(Math.PI*2f)); // convert back to screen units
 			float size = (float) n.getSize();
 			float newy = (float) mercLat2Y(n.pos.y);
-			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size *.90f / (float)cols);
-			
+			float newDia = (float) mercatorDiameter(n.pos.y, wScreen * size / (float)cols)-.25f;
 			ellipse(newx,newy,newDia,newDia);
 		}
 	}
@@ -785,7 +826,7 @@ public class Miraikan extends PApplet {
 		case '9':
 			start = frameCount;
 			inputimg = "data/360_landuse_IR.png";
-			loadBitmap(inputimg, false); 
+			loadBitmap(inputimg, false);
 			break;
 		case '8':
 			start = frameCount;

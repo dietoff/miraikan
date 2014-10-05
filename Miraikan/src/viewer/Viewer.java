@@ -13,29 +13,31 @@ public class Viewer extends PApplet {
 	private PImage img;
 	private PShape globe;
 	private File file;// = "/Volumes/Dropbox/testfiles_dietmar/migration streams/migration_bundle_cities-01.png";
-	private Float roty = 0f;
+	private float roty = 0f;
 	private int pointer=0;
 	private File[] list;
 	private boolean rec=false;
 	private float rotx = 0f;
-	
+	private int oldX=0;
+	private int oldY=0;
+
 	public void setup(){
-		size(1600, 1200, P3D);
-		perspective(PI/15, (float)(width)/(float)(height), 
-	            1, 2000);
+		size(800, 800, P3D);
+		perspective(PI/12, (float)(width)/(float)(height), 
+				1, 2000);
 		noStroke();
-		
+
 		file = new File("/Users/offenhuber_d/Downloads/capture/out");
 		list = file.listFiles();
 		getFile(list);
-		
+
 		sphereDetail(64);
 		smooth(8);
 		noStroke();
 		globe = createShape(SPHERE, 200); 
 		globe.setTexture(img);
 	}
-	
+
 	public void getFile(File[] list2) {
 		pointer++;
 		pointer = pointer%list2.length;
@@ -61,10 +63,10 @@ public class Viewer extends PApplet {
 			rec = false;
 		}
 	}
-	
+
 	public void keyReleased() {
 		switch (key){
-		
+
 		case ',':
 			roty +=0.1f;
 			break;
@@ -85,11 +87,23 @@ public class Viewer extends PApplet {
 			break;
 		}
 	}
+	public void mousePressed() {
+		oldX = mouseX;
+		oldY = mouseY;
+	}
 	
-	
-	public static void main(String args[]) {
-	    PApplet.main(new String[] { "viewer.Viewer" });
-	  }
+	public void mouseDragged() {
+		float deltaX = oldX - mouseX;
+		float deltaY = oldY - mouseY;
+		rotx = Math.max(-PI/2f, Math.min(PI/2f, rotx + deltaY/200f));
+		roty -= deltaX/180f;
+		oldX = mouseX;
+		oldY = mouseY;
+	}
 
-	
+	public static void main(String args[]) {
+		PApplet.main(new String[] { "viewer.Viewer" });
+	}
+
+
 }

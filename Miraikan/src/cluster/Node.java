@@ -7,8 +7,9 @@ public class Node {
 	Vector origin;
 	double diameter;
 	boolean target = false;
-	private double size;
+	private double size = 1;
 	private Cluster parent;
+	private double origsize = 1;
 	
 	public Node() {
 		col = 0xffffffff;
@@ -44,5 +45,14 @@ public class Node {
 	public void setParent(Cluster parent) {
 		this.parent = parent;
 	}
+
+	public double getOrigsize() {
+		return origsize;
+	}
+
+	public void setOrigsize(double origsize) {
+		this.origsize = origsize;
+	}
+
 	
 }
