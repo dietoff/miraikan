@@ -39,8 +39,7 @@ public class Viewer extends PApplet {
 	}
 
 	public void getFile(File[] list2) {
-		pointer++;
-		pointer = pointer%list2.length;
+		pointer = pointer%list2.length+1;
 		if (!list2[pointer].getName().endsWith(".png")) {
 			pointer++;
 			getFile(list2);
@@ -48,6 +47,7 @@ public class Viewer extends PApplet {
 			String absolutePath = list2[pointer].getAbsolutePath();
 			img = loadImage(absolutePath);
 		}
+		pointer++;
 	}
 
 	public void draw(){
