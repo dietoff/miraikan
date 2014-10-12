@@ -39,7 +39,7 @@ public class Viewer extends PApplet {
 	}
 
 	public void getFile(File[] list2) {
-		pointer = pointer%list2.length+1;
+		pointer = pointer%list2.length;
 		if (!list2[pointer].getName().endsWith(".png")) {
 			pointer++;
 			getFile(list2);

@@ -28,7 +28,7 @@ import processing.data.TableRow;
 import processing.pdf.*;
 
 public class Miraikan extends PApplet {
-	private static final int alpha = 200;
+	private static final int alpha = 160;
 	//	private static final double cutoff_lat = 85.0511; // dont consider pixels north of this latitude
 	private static double cutoff_lat = 88.97; // dont consider pixels north of this latitude
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
@@ -37,12 +37,13 @@ public class Miraikan extends PApplet {
 	int wScreen = 900;
 	int hScreen = (int)(wScreen*1.5);
 
-	
+
 	int background = this.color(20,60,100);
 	int halo = this.color(0,205,205,2);
-	
-//	int background = this.color(164,192,204);//20,60,100);
-//	int halo = this.color(80,95,100,3);//(0,205,205,2);
+
+	private boolean ishalo = true;
+	//	int background = this.color(164,192,204);//20,60,100);
+	//	int halo = this.color(80,95,100,3);//(0,205,205,2);
 	double wCoord,hCoord;
 
 	float diameter; // pixel size determined once image is loaded
@@ -60,18 +61,18 @@ public class Miraikan extends PApplet {
 
 	private boolean cluster = true;
 	private int cols;
-	private String tblfile = "data/500_grid.csv"; //1deg_grid
 	private char mode ='m';
 	private int counter = 0;
 	private int start=0;
 
 	private Miraikan p;
-	private boolean stack = true;
-	private boolean ishalo = true;
-	private int range = 100;
+	private boolean stack = false;
+	private int startrange = 130;
+	private int range = 130;
 	private double inc = 0.05;
 
 
+	private boolean rain = false;
 	Comparator<Node> comp = new Comparator<Node>() {
 		public int compare(Node o1, Node o2) {
 			int c1 = o1.getParent().color;
@@ -95,8 +96,6 @@ public class Miraikan extends PApplet {
 			return comp;
 		}
 	};
-
-
 	public void setup() {
 		p = this;
 		size(wScreen, hScreen,OPENGL);
@@ -115,7 +114,7 @@ public class Miraikan extends PApplet {
 		println("tot. n. nodes:"+ n);
 	}
 
-	private void loadTable(String file, String name, int color, double cutoff, int mode, float factor) { // mode: 1 - linear, 2- sqrt, 3-log10
+	private void loadTable(String file, String name, int color, double cutoff, int mode, float factor, int cols) { // mode: 1 - linear, 2- sqrt, 3-log10
 		Table table = loadTable(file,"header");
 		Cluster c = new Cluster(color + "", color);
 		double radFactor = PI/180.0; // for conversion
@@ -161,7 +160,8 @@ public class Miraikan extends PApplet {
 				case 2:
 					valN = map(val, min, max, 0f, 1f);
 					n.setSize(0);
-					n.setOrigsize(Math.log10(valN)*factor);
+					n.setOrigsize(Math.sqrt(valN)*factor);
+					break;
 				case 3:
 					valN = map(val, min, max, 1f, 10f);
 					n.setSize(0);
@@ -176,13 +176,13 @@ public class Miraikan extends PApplet {
 			}
 		}
 		diameter = maxX / (float)cols;
-		
+
 		setTiny(c.nodes.toArray(new Node[0]));
-		
+
 		HashMap<Integer,Cluster> map = new HashMap<Integer, Cluster>();
 		for (int i=0; i< clusters.length; i++)  map.put(clusters[i].color, clusters[i]);
 		map.put(c.color, c);
-		
+
 		registerNodes(map);
 	}
 
@@ -231,7 +231,7 @@ public class Miraikan extends PApplet {
 
 					if (brightness) {
 						size = brightness(image.get((int)j, (int)i))/255.0f;
-						color = this.color(255);
+						color = this.color(255, alpha);
 					}
 
 					Cluster c;
@@ -256,7 +256,7 @@ public class Miraikan extends PApplet {
 		//setTiny(map);
 		if (clusters != null  && clusters.length>0) for (int j=0; j<clusters.length; j++) {
 			if (map.get(clusters[j].color)==null)
-			map.put(clusters[j].color, clusters[j]);
+				map.put(clusters[j].color, clusters[j]);
 		}
 		registerNodes(map);
 		report();
@@ -276,7 +276,7 @@ public class Miraikan extends PApplet {
 			n.setSize(0);
 		}
 	}
-	
+
 	private void setTiny(HashMap<Integer, Cluster> map){
 		Collection<Cluster> values = map.values();
 		for (Cluster c:values) setTiny(c.nodes.toArray(new Node[0])); 
@@ -301,12 +301,16 @@ public class Miraikan extends PApplet {
 		}
 		nodes = ntmp.toArray(new Node[0]);
 	}
-	
-	
+
+
 	public void draw() {
 		if (rec) beginRecord(PDF, exportfile);
 		background(background);
-		blendMode(BLEND);
+		//blendMode(ADD);
+
+		if (rain) {
+			 nextRainImg();
+		}
 
 		switch (mode) {
 		case 'v': // sort horizontal
@@ -342,16 +346,16 @@ public class Miraikan extends PApplet {
 		List<Node> l = new ArrayList<Node>();
 		for (Node nn:nodes) l.add(nn);
 		int prevColor = nodes[0].col;
-		double y = Math.toRadians(25); //starting near the top
+		double y = Math.toRadians(-88.65); //starting near the top
 		Iterator<Node> n = l.iterator();
 		float x = 0;
 		while (n.hasNext()) {
 			Node node = n.next();
 
-			if (node.col != prevColor) {
-				x = 0;
-				y -= diameter*1.5;
-			}
+			//			if (node.col != prevColor) {
+			//				x = 0;
+			//				y -= diameter*1.5;
+			//			}
 
 			double mercDia = mercatorDiameter(y, diameter);
 			node.goal = new Vector(x * mercDia+mercDia/2, y);
@@ -360,7 +364,7 @@ public class Miraikan extends PApplet {
 			x+=g;
 			if (x > d-0.9 ) {
 				x = 0;
-				y -= diameter;
+				y += diameter;
 			}
 			prevColor = node.col;
 		}
@@ -503,14 +507,14 @@ public class Miraikan extends PApplet {
 	private void moveToGoal(Node[] nodes) {
 		if (nodes.length==0) return;
 		// make nodes move towards their goals, over multiple frames
-		int range = 300;  // larger is slower
-		int df = Math.max(1, nodes.length/range); // divides the number of nodes in [range] units, defining the chunk of nodes the loop goes through
-		int f = (frameCount-start)*df; // determine start frame based on current frame 
+		//		int range = 30;  // larger is slower
+		int df = Math.max(4, nodes.length/range); // divides the number of nodes in [range] units, defining the chunk of nodes the loop goes through
+		int f = (frameCount-start)*df; // determine start frame based on current frame  // delay by range frames
 
-		for (int i = 0; i < f*2; i++) {
+		for (int i = 0; i < Math.min(f, nodes.length); i++) {
 			Node n = nodes[i%nodes.length];
 			Vector d = Vector.subtract(n.goal, n.pos);
-			d.mult(.1f);
+			d.mult(inc*2);
 			n.pos.add(d);
 		}
 		//fadeIn();
@@ -519,10 +523,9 @@ public class Miraikan extends PApplet {
 
 
 	private void fadeIn() {
-		int range = 100; // larger is slower, more granular
-		int df = nodes.length/range; 
+		int df = Math.max(1, nodes.length/range);
 		int f = (frameCount-start)*df; // determine start frame based on current frame 
-		for (int i = 0; i < f*2; i++) {
+		for (int i = 0; i < Math.min(f, nodes.length); i++) {
 			Node n = nodes[i%nodes.length];
 			float r = this.red(n.col);
 			float g = this.green(n.col);
@@ -533,9 +536,9 @@ public class Miraikan extends PApplet {
 	}
 
 	private void scaleIn() {
-		int df = nodes.length/range ; 
+		int df = Math.max(1, nodes.length/range);
 		int f = (frameCount-start)*df; // determine start frame based on current frame 
-		for (int i = 0; i < f*4; i++) {
+		for (int i = 0; i < Math.min(f, nodes.length); i++) {
 			Node n = nodes[i%nodes.length];
 			n.setSize(Math.min(n.getOrigsize(),n.getSize()+inc ));
 			//n.setSize(1);
@@ -779,7 +782,7 @@ public class Miraikan extends PApplet {
 		for (int i = nodes.length-1; i>=0; i--) { // backwards, to prevent overwriting
 			Node n = nodes[i];
 			stroke(n.col);
-			if (n.getSize()>0.1) strokeWeight((float) Math.min(n.getSize(), 0.5f)); else noStroke();
+			strokeWeight((float) Math.min(n.getSize(), 0.5f)); 
 			fill(n.col);
 			float newx = (float) n.pos.x; // starts at 0, ends at 2pi
 			newx = (float) (newx*wScreen/(Math.PI*2f)); // convert back to screen units
@@ -819,40 +822,46 @@ public class Miraikan extends PApplet {
 			break;
 		case 'q':
 			start = frameCount;
-			range = 1;
-			loadTable(tblfile, "pop_sum", 0xffffffff, 250000,2,1.3f);
+			range = startrange;
+			loadTable("data/500_grid.csv", "pop_sum", 0xfffffff0, 250000,2,1.3f,500);
 			break;
 		case 'w':
 			start = frameCount;
-			range = 100;
-			loadTable(tblfile, "water_mean", 0xff33bbff, 100,2,1);
+			range = startrange;
+			loadTable("data/500_grid.csv", "water_mean", 0xff33bbff, 100,2,1,500);
+			break;
+		case 'y':
+			start = frameCount;
+			range = startrange;
+			loadTable("data/top20_cities_2050.csv", "pop2050", 0xffffffaa, 1,2,2f,500);
 			break;
 		case 'r':
-			counter ++;
-			counter = 1+counter%12;
-//			clusters=new Cluster[0];
-//			nodes = new Node[0];
+			rain  = true;
+			nextRainImg(); 
+			break;
+		case 't':
+			rain = false;
 			start = frameCount;
-			range = 1; 
-			loadBitmap("data/rain500/"+counter+".png", true, false); 
+			range = startrange;
+			loadBitmap("data/rain500/empty.png", true, false); 
 			break;
 		case '0':
 			start = frameCount;
-			range = 100;
+			range = startrange;
 			inputimg = "data/500_fullMap_recolor.png";
 			loadBitmap(inputimg, false, true); 
 			break;
 		case '9':
 			start = frameCount;
-			range = 100;
-			inputimg = "data/360_landuse_blue.png";
+			range = startrange;
+			inputimg = "data/500_fullMap_recolor.png";
 			loadBitmap(inputimg, false, true);
-			isolateCluster(4);
+			isolateCluster(3);
 			break;
 		case '8':
 			start = frameCount;
-			range = 100;
-			inputimg = "data/access2.png";
+			range = 200;
+			inputimg = "data/access3.png";
 			stack = true;
 			loadBitmap(inputimg, false, true);
 			break;
@@ -872,6 +881,15 @@ public class Miraikan extends PApplet {
 		}
 	}
 
+	private void nextRainImg() {
+		counter ++;
+		counter = 1+counter%12;
+		//			clusters=new Cluster[0];
+		//			nodes = new Node[0];
+		start = frameCount;
+		loadBitmap("data/rain500/"+counter+".png", true, false);
+	}
+
 	private void isolateCluster(int i) {
 		if (clusters!=null&&clusters.length>i) {
 			Cluster c = clusters[i];
@@ -884,10 +902,10 @@ public class Miraikan extends PApplet {
 
 	private void deleteCluster(int i) {
 		if (clusters!=null&&clusters.length>i) {
-			
+
 			ArrayList<Cluster> newcl = new ArrayList<Cluster>();
 			ArrayList<Node> newnd = new ArrayList<Node>();
-			
+
 			for (int j = 0; j< clusters.length; j++) {
 				if (j!=i)  {
 					newcl.add(clusters[j]);
@@ -899,7 +917,7 @@ public class Miraikan extends PApplet {
 			nodes = newnd.toArray(new Node[0]);
 		}
 	}
-	
+
 	private double distanceSq(Vector a, Vector b) {
 		double dx = a.x - b.x;
 		double dy = a.y - b.y;
