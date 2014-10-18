@@ -12,7 +12,7 @@ public class Viewer extends PApplet {
 
 	private PImage img;
 	private PShape globe;
-	private File file;// = "/Volumes/Dropbox/testfiles_dietmar/migration streams/migration_bundle_cities-01.png";
+	private File file;
 	private float roty = 0f;
 	private int pointer=0;
 	private File[] list;

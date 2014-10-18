@@ -1,5 +1,6 @@
 package cluster;
 
+import java.awt.Frame;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -33,16 +34,19 @@ public class Miraikan extends PApplet {
 	private static double cutoff_lat = 88.97; // dont consider pixels north of this latitude
 	private static final String exportfile = "/Users/offenhuber_d/Downloads/capture/frame-####.pdf";
 	private static String inputimg = "data/500_fullMap_recolor.png";// 500_fullMap_recolor 360_landuse_blue
-	boolean rec = false;
-	int wScreen = 900;
+
+	boolean rec = true;
+	int wScreen = 1000;
+	private boolean ishalo = false;
+
 	int hScreen = (int)(wScreen*1.5);
 
+	int background = this.color(70,70,70); // grey
+	//int background = this.color(20,60,100); // dark blue
+	//	int background = this.color(164,192,204);//20,60,100); // light blie
 
-	int background = this.color(20,60,100);
-	int halo = this.color(0,205,205,2);
-
-	private boolean ishalo = true;
-	//	int background = this.color(164,192,204);//20,60,100);
+	int halo = this.color(220,220,220,1); 
+	// int halo = this.color(0,205,205,2); // green grey
 	//	int halo = this.color(80,95,100,3);//(0,205,205,2);
 	double wCoord,hCoord;
 
@@ -66,10 +70,11 @@ public class Miraikan extends PApplet {
 	private int start=0;
 
 	private Miraikan p;
-	private boolean stack = false;
-	private int startrange = 130;
-	private int range = 130;
-	private double inc = 0.05;
+	private boolean stack = true;
+	private int startrange = 160;
+	private int range = 60;
+	private double inc = 0.1;
+
 
 
 	private boolean rain = false;
@@ -304,12 +309,16 @@ public class Miraikan extends PApplet {
 
 
 	public void draw() {
-		if (rec) beginRecord(PDF, exportfile);
-		background(background);
+		if (rec) {
+			updateScript(frameCount);
+			ishalo = true;
+			beginRecord(PDF, exportfile);
+		}
+		else background(background);
 		//blendMode(ADD);
 
 		if (rain) {
-			 nextRainImg();
+			nextRainImg();
 		}
 
 		switch (mode) {
@@ -333,6 +342,121 @@ public class Miraikan extends PApplet {
 		if (rec) {
 			endRecord();
 			//rec = false;
+		}
+	}
+
+	private void updateScript(int frameCount ) {
+		switch (frameCount) {
+//		case 1: // start recording here - bars fade in (100f)
+//			range = 1;
+//			inc = 1;
+//			start = frameCount;
+//			mode = 'b';
+//			setTiny(nodes);
+//			break;
+//		case 2:
+//			setTiny(nodes);
+//			break;
+//		case 3:
+//			range = 10;
+//			inc = 0.1;
+//			start = frameCount;
+//			setTiny(nodes);
+//			break;
+//		case 40:
+//			range = 50;
+//			start = frameCount;
+//			mode = 'm';
+//			break;
+		case 160:
+//			rec=false;
+			start = frameCount;
+			range = 50;
+			mode = 'b';
+			break;
+		case 350: // only cities remain, become cluster
+			isolateCluster(2);
+			mode = 'f';
+			break;
+		case 500: // population clusters appear (300f)
+			start = frameCount;
+			range = startrange;
+			loadTable("data/500_grid2.csv", "rural_pops", 0xffF9731E, 250000,2,1.0f,500);
+			loadTable("data/500_grid2.csv", "urban_pops", 0xffFFd11A, 250000,2,1.1f,500);
+			break;
+		case 800: // remove cities, population to map (200f)
+			deleteCluster(0);
+			start = frameCount;
+			mode = 'm';
+			break;
+		case 1000: // pop to histogram (300f)
+			start = frameCount;
+			mode = 'v';
+			stack=true;
+			break;
+		case 1300: // histogram back to map (100f)
+			start = frameCount;
+			range = 20;
+			mode = 'm';
+			break;
+		case 1400: // rain. sped up (100f)
+			rain  = true;
+			nextRainImg();
+			break;
+		case 1500: // water footprint (150f)
+			start = frameCount;
+			range = 100;
+			rain = false;
+			deleteCluster(0);
+			break;
+		case 1501:
+			start = frameCount;
+			loadTable("data/500_grid.csv", "water_mean", 0xff4CB4FF, 100,2,1,500);
+			break;
+		case 1650: // water footprint to histogram (200f)
+			start = frameCount;
+			range = startrange;
+			stack=false;
+			mode = 'v';
+			break;
+		case 1850:
+			start = frameCount;
+			range = startrange;
+			deleteCluster(0);
+			break;
+		case 2000:
+			break;
+		case 2050:
+			deleteCluster(1);
+			break;
+		case 2100:
+			deleteCluster(0);
+			break;
+		case 2150:
+			mode = 'm';
+			start = frameCount;
+			range = 200;
+			loadBitmap("data/access3.png", false, true);
+			break;
+		case 2450:
+			start = frameCount;
+			range = 100;
+			mode = 'h';
+			break;
+		case 2451:
+			deleteCluster(0);
+			break;
+		case 2700:
+			start = frameCount;
+			range = 10;
+			mode = 'm';
+			break;
+		case 2800:
+			rec = false;
+			break;
+		case 2801:
+			System.exit(0);
+			break;
 		}
 	}
 
@@ -514,7 +638,7 @@ public class Miraikan extends PApplet {
 		for (int i = 0; i < Math.min(f, nodes.length); i++) {
 			Node n = nodes[i%nodes.length];
 			Vector d = Vector.subtract(n.goal, n.pos);
-			d.mult(inc*2);
+			d.mult(inc);
 			n.pos.add(d);
 		}
 		//fadeIn();
@@ -540,7 +664,7 @@ public class Miraikan extends PApplet {
 		int f = (frameCount-start)*df; // determine start frame based on current frame 
 		for (int i = 0; i < Math.min(f, nodes.length); i++) {
 			Node n = nodes[i%nodes.length];
-			n.setSize(Math.min(n.getOrigsize(),n.getSize()+inc ));
+			n.setSize(Math.min(n.getOrigsize(),n.getSize()+inc/2 ));
 			//n.setSize(1);
 			float r = this.red(n.col);
 			float g = this.green(n.col);
@@ -763,7 +887,7 @@ public class Miraikan extends PApplet {
 	}
 
 	private void renderNodeBG(Node[]  nodes) {
-		for (int i = nodes.length-1; i>=0; i=i-7) {
+		for (int i = nodes.length-1; i>=0; i=i-5) {
 			Node n = nodes[i];
 			noStroke();
 			fill(halo);
@@ -799,15 +923,16 @@ public class Miraikan extends PApplet {
 	public void keyReleased() {
 		switch (key) {
 		case '=':
-			isolateCluster(3);
+			isolateCluster(1);
+//			deleteCluster(0);
 			break;
 		case '1':
 			mode = 'v';
 			start = frameCount;
 			break;
 		case '2':
-			mode = 'h';
 			start = frameCount;
+			mode = 'h';
 			break;
 		case '3':
 			mode = 'b';
@@ -823,12 +948,13 @@ public class Miraikan extends PApplet {
 		case 'q':
 			start = frameCount;
 			range = startrange;
-			loadTable("data/500_grid.csv", "pop_sum", 0xfffffff0, 250000,2,1.3f,500);
+			loadTable("data/500_grid2.csv", "rural_pops", 0xffF9731E, 250000,2,1.0f,500);
+			loadTable("data/500_grid2.csv", "urban_pops", 0xffFFd11A, 250000,2,1.1f,500);
 			break;
 		case 'w':
 			start = frameCount;
 			range = startrange;
-			loadTable("data/500_grid.csv", "water_mean", 0xff33bbff, 100,2,1,500);
+			loadTable("data/500_grid.csv", "water_mean", 0xff4CB4FF, 100,2,1,500);//00A1D9
 			break;
 		case 'y':
 			start = frameCount;
@@ -848,7 +974,7 @@ public class Miraikan extends PApplet {
 		case '0':
 			start = frameCount;
 			range = startrange;
-			inputimg = "data/500_fullMap_recolor.png";
+			inputimg = "data/500_fullMap_recolor.png"; //500_fullMap_recolor
 			loadBitmap(inputimg, false, true); 
 			break;
 		case '9':
@@ -856,11 +982,11 @@ public class Miraikan extends PApplet {
 			range = startrange;
 			inputimg = "data/500_fullMap_recolor.png";
 			loadBitmap(inputimg, false, true);
-			isolateCluster(3);
+			isolateCluster(2);
 			break;
 		case '8':
 			start = frameCount;
-			range = 200;
+//			2range = 200;
 			inputimg = "data/access3.png";
 			stack = true;
 			loadBitmap(inputimg, false, true);
@@ -868,6 +994,10 @@ public class Miraikan extends PApplet {
 		case '-':
 			clusters=new Cluster[0];
 			nodes = new Node[0];
+			break;
+		case '`':
+			start = frameCount;
+			setTiny(nodes);
 			break;
 		case 'c':
 			cluster = !cluster;
